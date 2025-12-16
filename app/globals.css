@@ -1,0 +1,72 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+:root {
+  /* Premium Color Palette - HSL */
+  /* Primary: Vibrant Indigo/Purple */
+  --primary: 250 80% 55%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary: Soft Teal/Cyan */
+  --secondary: 180 60% 50%;
+  --secondary-foreground: 0 0% 100%;
+
+  /* Accent: Coral/Pink for CTAs */
+  --accent: 340 85% 60%;
+  --accent-foreground: 0 0% 100%;
+
+  /* Backgrounds */
+  --background: 220 20% 98%;
+  /* Very light cool gray */
+  --foreground: 220 20% 10%;
+  /* Dark cool gray */
+
+  --card: 0 0% 100%;
+  --card-foreground: 220 20% 10%;
+
+  --muted: 220 10% 94%;
+  --muted-foreground: 220 10% 40%;
+
+  --border: 220 10% 90%;
+  --input: 220 10% 90%;
+  --ring: 250 80% 55%;
+
+  --radius: 0.75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 222 47% 11%;
+    /* Deep dark blue-gray */
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 13%;
+    --card-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-lg border border-white/20;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
