@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { getConversations, getMessages, sendMessage, markMessagesAsRead, subscribeToMessages } from '@/lib/messageService';
 
-export default function MessagesPage() {
+function MessagesPageContent() {
     const { user, profile } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -393,5 +393,13 @@ export default function MessagesPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function MessagesPage() {
+    return (
+        <Suspense fallback={<div>Loading conversations...</div>}>
+            <MessagesPageContent />
+        </Suspense>
     );
 }

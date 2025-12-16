@@ -2,13 +2,14 @@
 
 import { withAuth } from '@/lib/withAuth';
 import { useAuth } from '@/context/AuthContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 
-function OwnerDashboard() {
+
+function OwnerDashboardContent() {
     const { user, profile, signOut } = useAuth();
     const searchParams = useSearchParams();
     const [listings, setListings] = useState([]);
@@ -262,6 +263,14 @@ function OwnerDashboard() {
                 isLoading={deleteModal.loading}
             />
         </div>
+    );
+}
+
+function OwnerDashboard() {
+    return (
+        <Suspense fallback={<div>Loading dashboard...</div>}>
+            <OwnerDashboardContent />
+        </Suspense>
     );
 }
 

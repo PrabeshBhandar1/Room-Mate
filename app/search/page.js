@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function SearchPage() {
+
+function SearchPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [listings, setListings] = useState([]);
@@ -287,5 +288,13 @@ export default function SearchPage() {
                 </div>
             </main>
         </div>
+    );
+}
+
+export default function SearchPage() {
+    return (
+        <Suspense fallback={<div>Loading search...</div>}>
+            <SearchPageContent />
+        </Suspense>
     );
 }
