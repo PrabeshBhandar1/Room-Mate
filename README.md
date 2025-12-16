@@ -1,36 +1,134 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+🏠 RoomMate – Online Room Rental Platform
 
-## Getting Started
+RoomMate is a modern web-based rental room management system designed for Nepal. It connects tenants, house owners (landlords), and admins through a secure and transparent digital platform. The system eliminates dependency on brokers and enables direct communication using real-time chat.
 
-First, run the development server:
+🚀 Features
+👤 User Roles
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Tenant
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Search and filter rooms
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+View verified listings
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Contact owners via real-time chat
 
-## Learn More
+Request booking and schedule visits
 
-To learn more about Next.js, take a look at the following resources:
+Owner (Landlord)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Add, edit, and delete room listings
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Upload room images
 
-## Deploy on Vercel
+Communicate with tenants
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Manage booking requests
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Admin (Mandatory Role)
+
+Verify and approve room listings
+
+Manage users (tenants & owners)
+
+Moderate chats and listings
+
+Ensure platform security and trust
+
+💬 Real-Time Chat System
+
+Built using Supabase Realtime
+
+One-to-one chat between tenant and owner
+
+Instant message delivery
+
+Secure access using Row Level Security (RLS)
+
+Admin view-only access for moderation
+
+🛠️ Technology Stack
+Frontend
+
+Next.js (App Router)
+
+Tailwind CSS
+
+Backend (BaaS)
+
+Supabase
+
+Authentication (Email/Password)
+
+PostgreSQL Database
+
+Storage (Room Images)
+
+Realtime (Chat System)
+
+🗂️ Database Tables
+users
+
+id (uuid)
+
+name
+
+email
+
+phone
+
+role (admin / owner / tenant)
+
+listings
+
+id
+
+owner_id
+
+title
+
+rent
+
+location
+
+facilities[]
+
+images[]
+
+status (pending / approved / rejected)
+
+created_at
+
+chat_rooms
+
+id
+
+listing_id
+
+owner_id
+
+tenant_id
+
+created_at
+
+messages
+
+id
+
+chat_room_id
+
+sender_id
+
+message
+
+created_at
+
+🔐 Security
+
+Supabase Row Level Security (RLS) enabled
+
+Role-based access control
+
+Only approved listings are visible publicly
+
+Chat access restricted to participants and admin
