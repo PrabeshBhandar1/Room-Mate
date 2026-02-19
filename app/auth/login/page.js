@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -22,13 +23,15 @@ export default function Login() {
         const { error } = await signIn(email, password);
 
         if (error) {
-            setError(error.message);
+            toast.error(error.message || 'Failed to sign in');
             setLoading(false);
+        } else {
+            toast.success('Signed in successfully!');
         }
-        // Don't redirect here - let useEffect handle it after profile loads
+
     };
 
-    // Redirect based on role after profile is loaded
+
     useEffect(() => {
         if (profile) {
             if (profile.role === 'owner') {

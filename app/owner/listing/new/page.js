@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+import Navbar from '@/components/Navbar';
+
 function NewListing() {
     const { user, profile } = useAuth();
     const router = useRouter();
@@ -132,20 +134,7 @@ function NewListing() {
 
     return (
         <div className="min-h-screen bg-background">
-            {/* Header */}
-            <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-white/70 backdrop-blur-lg">
-                <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <Link href="/owner/dashboard" className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">
-                            R
-                        </div>
-                        <span className="text-xl font-bold tracking-tight">RoomMate</span>
-                    </Link>
-                    <Link href="/owner/dashboard" className="text-sm text-muted-foreground hover:text-primary">
-                        ← Back to Dashboard
-                    </Link>
-                </div>
-            </header>
+            <Navbar />
 
             {/* Main Content */}
             <main className="container mx-auto px-4 py-8">

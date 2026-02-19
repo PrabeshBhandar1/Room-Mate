@@ -6,6 +6,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { toast } from 'sonner';
+
+import Navbar from '@/components/Navbar';
 
 export default function Home() {
   const { user, profile, signOut } = useAuth();
@@ -15,11 +18,14 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchRecentListings();
-  }, []);
+    if (user) {
+      fetchRecentListings();
+    }
+  }, [user]);
 
   const fetchRecentListings = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('listings')
         .select('*')
@@ -30,7 +36,7 @@ export default function Home() {
       if (error) throw error;
       setRecentListings(data || []);
     } catch (error) {
-      console.error('Error fetching listings:', error);
+      toast.error('Failed to load recent listings');
     } finally {
       setLoading(false);
     }
@@ -38,6 +44,10 @@ export default function Home() {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
     if (searchQuery.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
     } else {
@@ -47,54 +57,9 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Navbar */}
-      <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-white/70">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div>
-            <Image src="/images/RoomMate1.png" alt="Logo" width={70} height={70} />
-          </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-            <Link href="/search" className="hover:text-primary transition-colors">Search</Link>
-            {user && (
-              <Link href="/messages" className="hover:text-primary transition-colors">Messages</Link>
-            )}
-            {user && profile?.role === 'owner' && (
-              <Link href="/owner/dashboard" className="hover:text-primary transition-colors">Dashboard</Link>
-            )}
-            {user && profile?.role === 'admin' && (
-              <Link href="/admin/dashboard" className="hover:text-primary transition-colors">Admin</Link>
-            )}
-            <Link href="#" className="hover:text-primary transition-colors">About</Link>
-          </nav>
-          <div className="flex items-center gap-4">
-            {user ? (
-              <>
-                <span className="text-sm text-muted-foreground hidden md:inline">
-                  {profile?.display_name || user.email}
-                </span>
-                <button
-                  onClick={signOut}
-                  className="text-sm font-medium hover:text-primary transition-colors"
-                >
-                  Sign Out
-                </button>
-              </>
-            ) : (
-              <>
-                <Link href="/auth/login" className="text-sm font-medium hover:text-primary transition-colors">
-                  Sign In
-                </Link>
-                <Link
-                  href="/auth/signup"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-primary/20"
-                >
-                  Get Started
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+      <Navbar />
+
+      {/* Hero Section */}
 
       {/* Hero Section */}
       <section className="flex-1 flex flex-col items-center justify-center px-4 py-24 text-center relative overflow-hidden">
@@ -237,50 +202,75 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Recent Listings Section */}
-      {recentListings.length > 0 && (
-        <section className="container mx-auto px-4 py-16">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-3">Recent Listings</h2>
-            <p className="text-muted-foreground">Discover the latest approved properties</p>
-          </div>
+      {/* Recent Listings Section or Login CTA */}
+      {user ? (
+        recentListings.length > 0 && (
+          <section className="container mx-auto px-4 py-16">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold mb-3">Recent Listings</h2>
+              <p className="text-muted-foreground">Discover the latest approved properties</p>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recentListings.map((listing) => (
-              <Link
-                key={listing.id}
-                href={`/listing/${listing.id}`}
-                className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
-              >
-                <div className="h-48 bg-muted flex items-center justify-center text-muted-foreground">
-                  📷 Photo
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold mb-2">{listing.title}</h3>
-                  <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                    {listing.description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-primary">
-                      NPR {listing.price_per_month}
-                      <span className="text-sm text-muted-foreground">/month</span>
-                    </span>
-                    <span className="text-sm text-muted-foreground capitalize">
-                      {listing.area_name}
-                    </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recentListings.map((listing) => (
+                <Link
+                  key={listing.id}
+                  href={`/listing/${listing.id}`}
+                  className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
+                >
+                  <div className="h-48 bg-muted flex items-center justify-center text-muted-foreground">
+                    📷 Photo
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold mb-2">{listing.title}</h3>
+                    <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                      {listing.description}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-bold text-primary">
+                        NPR {listing.price_per_month}
+                        <span className="text-sm text-muted-foreground">/month</span>
+                      </span>
+                      <span className="text-sm text-muted-foreground capitalize">
+                        {listing.area_name}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
 
-          <div className="text-center mt-12">
-            <Link
-              href="/search"
-              className="inline-flex h-12 px-8 rounded-xl border border-input bg-background hover:bg-accent hover:text-accent-foreground font-medium transition-colors items-center justify-center"
-            >
-              View All Listings →
-            </Link>
+            <div className="text-center mt-12">
+              <Link
+                href="/search"
+                className="inline-flex h-12 px-8 rounded-xl border border-input bg-background hover:bg-accent hover:text-accent-foreground font-medium transition-colors items-center justify-center"
+              >
+                View All Listings →
+              </Link>
+            </div>
+          </section>
+        )
+      ) : (
+        <section className="container mx-auto px-4 py-16 text-center">
+          <div className="bg-card border border-border rounded-2xl p-12 max-w-2xl mx-auto shadow-sm">
+            <h2 className="text-3xl font-bold mb-4">View All Listings</h2>
+            <p className="text-muted-foreground mb-8">
+              Sign in to browse available rooms and flats across Kathmandu Valley and connect with verified property owners.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/auth/login"
+                className="h-12 px-8 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all shadow-xl shadow-primary/25 w-full sm:w-auto inline-flex items-center justify-center"
+              >
+                Sign In to View
+              </Link>
+              <Link
+                href="/auth/signup"
+                className="h-12 px-8 rounded-xl border border-input bg-background hover:bg-accent hover:text-accent-foreground font-medium transition-colors w-full sm:w-auto inline-flex items-center justify-center"
+              >
+                Create Account
+              </Link>
+            </div>
           </div>
         </section>
       )}

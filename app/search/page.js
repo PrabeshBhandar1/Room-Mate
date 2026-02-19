@@ -2,15 +2,28 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import { toast } from 'sonner';
 
+
+import Navbar from '@/components/Navbar';
+import { withAuth } from '@/lib/withAuth';
 
 function SearchPageContent() {
-    const router = useRouter();
+    const { profile } = useAuth();
     const searchParams = useSearchParams();
     const [listings, setListings] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Modal state for deletion
+    const [deleteModal, setDeleteModal] = useState({
+        isOpen: false,
+        listingId: null,
+        loading: false
+    });
 
     // Filter states
     const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
@@ -88,7 +101,7 @@ function SearchPageContent() {
 
             setListings(filteredData);
         } catch (error) {
-            console.error('Error fetching listings:', error);
+            toast.error('Failed to load listings');
         } finally {
             setLoading(false);
         }
@@ -108,22 +121,44 @@ function SearchPageContent() {
         setResetKey(prev => prev + 1);
     };
 
+    const handleDeleteClick = (e, listingId) => {
+        e.preventDefault(); // Prevent navigation to detail page
+        e.stopPropagation();
+        setDeleteModal({
+            isOpen: true,
+            listingId,
+            loading: false
+        });
+    };
+
+    const handleConfirmDelete = async () => {
+        const { listingId } = deleteModal;
+        if (!listingId) return;
+
+        setDeleteModal(prev => ({ ...prev, loading: true }));
+
+        try {
+            const { error } = await supabase
+                .from('listings')
+                .delete()
+                .eq('id', listingId);
+
+            if (error) throw error;
+
+            // Remove from local state
+            setListings(prev => prev.filter(l => l.id !== listingId));
+
+            setDeleteModal({ isOpen: false, listingId: null, loading: false });
+            toast.success('Listing deleted successfully');
+        } catch (error) {
+            toast.error('Failed to delete listing');
+            setDeleteModal(prev => ({ ...prev, loading: false }));
+        }
+    };
+
     return (
         <div className="min-h-screen bg-background">
-            {/* Header */}
-            <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-white/70 backdrop-blur-lg">
-                <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <Link href="/" className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">
-                            R
-                        </div>
-                        <span className="text-xl font-bold tracking-tight">RoomMate</span>
-                    </Link>
-                    <Link href="/" className="text-sm text-muted-foreground hover:text-primary">
-                        ← Back to Home
-                    </Link>
-                </div>
-            </header>
+            <Navbar />
 
             {/* Main Content */}
             <main className="container mx-auto px-4 py-8">
@@ -242,59 +277,83 @@ function SearchPageContent() {
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {listings.map((listing) => (
-                                    <Link
+                                    <div
                                         key={listing.id}
-                                        href={`/listing/${listing.id}`}
-                                        className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
+                                        className="relative group bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
                                     >
-                                        <div className="h-48 bg-muted relative">
-                                            {listing.photoUrl ? (
-                                                <img
-                                                    src={listing.photoUrl}
-                                                    alt={listing.title}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                                    📷 Photo
+                                        <Link href={`/listing/${listing.id}`} className="block">
+                                            <div className="h-48 bg-muted relative">
+                                                {listing.photoUrl ? (
+                                                    <img
+                                                        src={listing.photoUrl}
+                                                        alt={listing.title}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                                        📷 Photo
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="p-6">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <h3 className="text-xl font-bold">{listing.title}</h3>
+                                                    <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full capitalize">
+                                                        {listing.listing_type}
+                                                    </span>
                                                 </div>
-                                            )}
-                                        </div>
-                                        <div className="p-6">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <h3 className="text-xl font-bold">{listing.title}</h3>
-                                                <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full capitalize">
-                                                    {listing.listing_type}
-                                                </span>
+                                                <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                                                    {listing.description}
+                                                </p>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-2xl font-bold text-primary">
+                                                        NPR {listing.price_per_month}
+                                                        <span className="text-sm text-muted-foreground">/month</span>
+                                                    </span>
+                                                    <span className="text-sm text-muted-foreground">
+                                                        📍 {listing.area_name}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                                                {listing.description}
-                                            </p>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-2xl font-bold text-primary">
-                                                    NPR {listing.price_per_month}
-                                                    <span className="text-sm text-muted-foreground">/month</span>
-                                                </span>
-                                                <span className="text-sm text-muted-foreground">
-                                                    📍 {listing.area_name}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </Link>
+                                        </Link>
+
+                                        {/* Admin Delete Action */}
+                                        {profile?.role === 'admin' && (
+                                            <button
+                                                onClick={(e) => handleDeleteClick(e, listing.id)}
+                                                className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-700 z-10"
+                                                title="Delete Listing"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                            </button>
+                                        )}
+                                    </div>
                                 ))}
                             </div>
                         )}
                     </div>
                 </div>
+
+                <ConfirmationModal
+                    isOpen={deleteModal.isOpen}
+                    onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+                    onConfirm={handleConfirmDelete}
+                    title="Delete Listing"
+                    message="Are you sure you want to delete this listing? This action is permanent and cannot be undone."
+                    confirmText="Delete Listing"
+                    isLoading={deleteModal.loading}
+                />
             </main>
         </div>
     );
 }
 
-export default function SearchPage() {
+function SearchPage() {
     return (
         <Suspense fallback={<div>Loading search...</div>}>
             <SearchPageContent />
         </Suspense>
     );
 }
+
+export default withAuth(SearchPage);

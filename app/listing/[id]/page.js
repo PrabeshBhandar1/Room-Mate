@@ -5,13 +5,17 @@ import { withAuth } from '@/lib/withAuth';
 import { supabase } from '@/lib/supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 import Link from 'next/link';
 import Image from 'next/image';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
+
+import Navbar from '@/components/Navbar';
 
 function ListingDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const listingId = params.id;
 
     const [listing, setListing] = useState(null);
@@ -19,6 +23,12 @@ function ListingDetailPage() {
     const [owner, setOwner] = useState(null);
     const [loading, setLoading] = useState(true);
     const [selectedPhoto, setSelectedPhoto] = useState(0);
+
+    // Modal state for deletion
+    const [deleteModal, setDeleteModal] = useState({
+        isOpen: false,
+        loading: false
+    });
 
     useEffect(() => {
         if (listingId) {
@@ -68,9 +78,37 @@ function ListingDetailPage() {
             setPhotos(photosWithUrls);
 
         } catch (error) {
-            console.error('Error fetching listing:', error);
+            toast.error('Failed to load listing details');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteClick = () => {
+        setDeleteModal({
+            isOpen: true,
+            loading: false
+        });
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!listingId) return;
+
+        setDeleteModal(prev => ({ ...prev, loading: true }));
+
+        try {
+            const { error } = await supabase
+                .from('listings')
+                .delete()
+                .eq('id', listingId);
+
+            if (error) throw error;
+
+            toast.success('Listing deleted successfully');
+            router.push('/search');
+        } catch (error) {
+            toast.error('Failed to delete listing');
+            setDeleteModal(prev => ({ ...prev, loading: false }));
         }
     };
 
@@ -100,20 +138,7 @@ function ListingDetailPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            {/* Header */}
-            <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-white/70 backdrop-blur-lg">
-                <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <Link href="/" className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">
-                            R
-                        </div>
-                        <span className="text-xl font-bold tracking-tight">RoomMate</span>
-                    </Link>
-                    <Link href="/search" className="text-sm text-muted-foreground hover:text-primary">
-                        ← Back to Search
-                    </Link>
-                </div>
-            </header>
+            <Navbar />
 
             {/* Main Content */}
             <main className="container mx-auto px-4 py-8">
@@ -234,6 +259,20 @@ function ListingDetailPage() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Admin Actions */}
+                            {profile?.role === 'admin' && (
+                                <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-6">
+                                    <h3 className="font-bold text-red-600 mb-3">Admin Actions</h3>
+                                    <button
+                                        onClick={handleDeleteClick}
+                                        disabled={deleteModal.loading}
+                                        className="w-full h-11 px-6 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                                    >
+                                        Delete Listing Permanent
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Sidebar */}
@@ -269,16 +308,6 @@ function ListingDetailPage() {
                                 )}
                             </div>
 
-                            {/* Message Owner Button */}
-                            {user && owner && user.id !== listing.owner_id && (
-                                <Link
-                                    href={`/messages?listing=${listingId}&with=${listing.owner_id}`}
-                                    className="block w-full h-12 px-6 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-colors text-center leading-[3rem]"
-                                >
-                                    💬 Message Owner
-                                </Link>
-                            )}
-
                             {/* Action Button */}
                             <Link
                                 href="/search"
@@ -289,6 +318,17 @@ function ListingDetailPage() {
                         </div>
                     </div>
                 </div>
+
+                <ConfirmationModal
+                    isOpen={deleteModal.isOpen}
+                    onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+                    onConfirm={handleConfirmDelete}
+                    title="Delete Listing Permanently"
+                    message="Are you sure you want to delete this listing? This action is permanent and cannot be undone."
+                    confirmText="Delete Listing"
+                    confirmVariant="danger"
+                    isLoading={deleteModal.loading}
+                />
             </main>
         </div>
     );

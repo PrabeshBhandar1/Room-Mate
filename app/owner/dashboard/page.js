@@ -7,7 +7,10 @@ import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import { toast } from 'sonner';
 
+
+import Navbar from '@/components/Navbar';
 
 function OwnerDashboardContent() {
     const { user, profile, signOut } = useAuth();
@@ -49,7 +52,7 @@ function OwnerDashboardContent() {
 
             setStats({ total, pending, approved, rejected });
         } catch (error) {
-            console.error('Error fetching listings:', error);
+            toast.error('Failed to load your listings');
         } finally {
             setLoading(false);
         }
@@ -91,9 +94,9 @@ function OwnerDashboardContent() {
             }
 
             setDeleteModal({ isOpen: false, listingId: null, loading: false });
+            toast.success('Listing deleted successfully');
         } catch (error) {
-            console.error('Error deleting listing:', error);
-            alert('Failed to delete listing');
+            toast.error('Failed to delete listing');
             setDeleteModal(prev => ({ ...prev, loading: false }));
         }
     };
@@ -115,28 +118,7 @@ function OwnerDashboardContent() {
 
     return (
         <div className="min-h-screen bg-background">
-            {/* Header */}
-            <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-white/70 backdrop-blur-lg">
-                <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <Link href="/" className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">
-                            R
-                        </div>
-                        <span className="text-xl font-bold tracking-tight">RoomMate</span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        <span className="text-sm text-muted-foreground hidden md:inline">
-                            {profile?.display_name || 'Owner'}
-                        </span>
-                        <button
-                            onClick={signOut}
-                            className="text-sm font-medium hover:text-primary transition-colors"
-                        >
-                            Sign Out
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <Navbar />
 
             {/* Main Content */}
             <main className="container mx-auto px-4 py-8">
@@ -177,7 +159,7 @@ function OwnerDashboardContent() {
                             <p className="text-3xl font-bold text-green-500">{stats.approved}</p>
                         </div>
                         <div className="bg-card border border-border rounded-xl p-6">
-                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Rejected</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Rejected Listings</h3>
                             <p className="text-3xl font-bold text-red-500">{stats.rejected}</p>
                         </div>
                     </div>

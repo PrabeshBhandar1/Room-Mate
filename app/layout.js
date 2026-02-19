@@ -13,6 +13,8 @@ export const metadata = {
 };
 
 import { AuthProvider } from "@/context/AuthContext";
+import ToastProvider from '@/components/ToastProvider';
+import './globals.css';
 
 export default function RootLayout({ children }) {
   return (
@@ -21,6 +23,7 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           {children}
         </AuthProvider>
+        <ToastProvider />
       </body>
     </html>
   );

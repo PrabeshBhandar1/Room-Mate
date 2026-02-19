@@ -160,12 +160,22 @@ function AdminListingDetail() {
             {/* Header */}
             <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-white/70 backdrop-blur-lg">
                 <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <Link href="/admin/dashboard" className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">
-                            R
-                        </div>
-                        <span className="text-xl font-bold tracking-tight">RoomMate Admin</span>
-                    </Link>
+                    <div className="flex items-center gap-6">
+                        <Link href="/admin/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                            <Image
+                                src="/images/RoomMate1.png"
+                                alt="RoomMate Logo"
+                                width={50}
+                                height={50}
+                                priority
+                                className="object-contain"
+                            />
+                            <span className="text-xl font-bold tracking-tight">RoomMate Admin</span>
+                        </Link>
+                        <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors border-l border-border pl-6">
+                            View Site
+                        </Link>
+                    </div>
                     <button
                         onClick={signOut}
                         className="text-sm font-medium hover:text-primary transition-colors"

@@ -5,7 +5,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
+import Image from 'next/image';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import { toast } from 'sonner';
 
 function AdminDashboard() {
     const { user, profile, signOut } = useAuth();
@@ -31,24 +33,16 @@ function AdminDashboard() {
         try {
             setLoading(true);
 
-            // Fetch Stats
-            const [
-                { count: totalListings },
-                { count: pendingCount },
-                { count: totalUsers },
-                { count: activeOwners }
-            ] = await Promise.all([
-                supabase.from('listings').select('*', { count: 'exact', head: true }),
-                supabase.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-                supabase.from('users').select('*', { count: 'exact', head: true }),
-                supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'owner')
-            ]);
+            // Fetch Stats using RPC (bypasses RLS)
+            const { data: statsData, error: statsError } = await supabase.rpc('get_admin_stats');
+
+            if (statsError) throw statsError;
 
             setStats({
-                totalListings: totalListings || 0,
-                pendingListings: pendingCount || 0,
-                totalUsers: totalUsers || 0,
-                activeOwners: activeOwners || 0
+                totalListings: statsData.total_listings || 0,
+                pendingListings: statsData.pending_listings || 0,
+                totalUsers: statsData.total_tenants || 0,
+                activeOwners: statsData.total_owners || 0
             });
 
             // Fetch Pending Listings (without join)
@@ -82,7 +76,7 @@ function AdminDashboard() {
             }
 
         } catch (error) {
-            console.error('Error fetching admin dashboard data:', error);
+            toast.error('Failed to load dashboard data');
         } finally {
             setLoading(false);
         }
@@ -114,10 +108,10 @@ function AdminDashboard() {
             }));
 
             setApproveModal({ isOpen: false, loading: false, listingId: null });
+            toast.success('Listing approved successfully');
 
         } catch (error) {
-            console.error('Error approving listing:', error);
-            alert('Failed to approve listing');
+            toast.error('Failed to approve listing');
             setApproveModal({ isOpen: false, loading: false, listingId: null });
         }
     };
@@ -151,10 +145,10 @@ function AdminDashboard() {
             }));
 
             setRejectModal({ isOpen: false, loading: false, listingId: null });
+            toast.success('Listing rejected');
 
         } catch (error) {
-            console.error('Error rejecting listing:', error);
-            alert('Failed to reject listing');
+            toast.error('Failed to reject listing');
             setRejectModal({ isOpen: false, loading: false, listingId: null });
         }
     };
@@ -165,11 +159,21 @@ function AdminDashboard() {
             {/* Header */}
             <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-white/70 backdrop-blur-lg">
                 <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">
-                            R
-                        </div>
-                        <span className="text-xl font-bold tracking-tight">RoomMate Admin</span>
+                    <div className="flex items-center gap-6">
+                        <Link href="/admin/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                            <Image
+                                src="/images/RoomMate1.png"
+                                alt="RoomMate Logo"
+                                width={50}
+                                height={50}
+                                priority
+                                className="object-contain"
+                            />
+                            <span className="text-xl font-bold tracking-tight">RoomMate Admin</span>
+                        </Link>
+                        <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors border-l border-border pl-6">
+                            View Site
+                        </Link>
                     </div>
                     <div className="flex items-center gap-4">
                         <span className="text-sm text-muted-foreground">
@@ -204,11 +208,11 @@ function AdminDashboard() {
                             <p className="text-3xl font-bold text-yellow-500">{stats.pendingListings}</p>
                         </div>
                         <div className="bg-card border border-border rounded-xl p-6">
-                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Users</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Tenants</h3>
                             <p className="text-3xl font-bold">{stats.totalUsers}</p>
                         </div>
                         <div className="bg-card border border-border rounded-xl p-6">
-                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Active Owners</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Owners</h3>
                             <p className="text-3xl font-bold text-green-500">{stats.activeOwners}</p>
                         </div>
                     </div>

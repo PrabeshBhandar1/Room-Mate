@@ -88,31 +88,26 @@ export const AuthProvider = ({ children }) => {
 
     const signUp = async (email, password, role, displayName, phone) => {
         try {
-            // 1. Sign up with Supabase Auth
+            // 1. Sign up with Supabase Auth including metadata
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/confirm`,
+                    data: {
+                        display_name: displayName,
+                        role: role,
+                        phone: phone
+                    }
+                }
             });
 
             if (error) throw error;
 
-            if (data?.user) {
-                // 2. Create user profile using RPC function (bypasses RLS)
-                const { data: profileData, error: profileError } = await supabase
-                    .rpc('create_user_profile', {
-                        user_id: data.user.id,
-                        user_role: role,
-                        user_display_name: displayName,
-                        user_phone: phone,
-                    });
+            // Note: User profile is now automatically created via a database trigger
+            // using the metadata provided above. This is more robust as it works
+            // even when email confirmation is enabled.
 
-                if (profileError) {
-                    console.error('Error creating user profile:', profileError);
-                    throw profileError;
-                }
-
-                console.log('Profile created successfully:', profileData);
-            }
             return { data, error: null };
         } catch (error) {
             console.error('Signup error:', error);
@@ -142,8 +137,28 @@ export const AuthProvider = ({ children }) => {
         return { error };
     };
 
+    const updateProfile = async (updates) => {
+        try {
+            if (!user) throw new Error('No user logged in');
+
+            const { data, error } = await supabase
+                .from('users')
+                .update(updates)
+                .eq('id', user.id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            setProfile(data);
+            return { data, error: null };
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            return { data: null, error };
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut }}>
+        <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, updateProfile }}>
             {children}
         </AuthContext.Provider>
     );
