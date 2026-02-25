@@ -1,48 +1,65 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
-export default function Login() {
+function LoginContent() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState(null);
+    const [loginError, setLoginError] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    const { signIn, profile } = useAuth();
+    const { signIn, user, profile } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        // Show success toast if coming from email verification
+        if (searchParams.get('verified') === 'true') {
+            toast.success('Email verified successfully! Please sign in.');
+            // Remove the query param to avoid multiple toasts
+            router.replace('/auth/login', { scroll: false });
+        }
+    }, [searchParams, router]);
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError(null);
+        setLoginError(null);
         setLoading(true);
 
-        const { error } = await signIn(email, password);
+        try {
+            const { error } = await signIn(email, password);
 
-        if (error) {
-            toast.error(error.message || 'Failed to sign in');
+            if (error) {
+                setLoginError(error.message || 'Failed to sign in');
+                toast.error(error.message || 'Failed to sign in');
+                setLoading(false);
+            } else {
+                toast.success('Signed in successfully!');
+            }
+        } catch (err) {
+            setLoginError('An unexpected error occurred');
+            toast.error('An unexpected error occurred');
             setLoading(false);
-        } else {
-            toast.success('Signed in successfully!');
         }
-
     };
 
 
     useEffect(() => {
-        if (profile) {
-            if (profile.role === 'owner') {
-                router.push('/owner/dashboard');
-            } else if (profile.role === 'admin') {
-                router.push('/admin/dashboard');
-            } else {
-                router.push('/');
+        if (user && profile) {
+            const target = profile.role === 'owner' ? '/owner/dashboard' :
+                profile.role === 'admin' ? '/admin/dashboard' : '/';
+            console.log(`Login: Auth complete (user=${user.id}), redirecting to ${target}`);
+            const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
+            if (currentPath !== target.replace(/\/$/, '')) {
+                router.push(target);
             }
         }
-    }, [profile, router]);
+    }, [user, profile, router]);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
@@ -52,9 +69,9 @@ export default function Login() {
                     <p className="text-muted-foreground mt-2">Sign in to continue</p>
                 </div>
 
-                {error && (
+                {loginError && (
                     <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg mb-6">
-                        {error}
+                        {loginError}
                     </div>
                 )}
 
@@ -98,5 +115,17 @@ export default function Login() {
                 </p>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
     );
 }

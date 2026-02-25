@@ -631,4 +631,5 @@ function EditListing() {
     );
 }
 
-export default withAuth(EditListing, { allowedRoles: ['owner'] });
+export default withAuth(EditListing, { allowedRoles: ['owner'], requireVerified: true });
+

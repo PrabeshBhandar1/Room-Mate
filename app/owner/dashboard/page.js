@@ -13,11 +13,24 @@ import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 
 function OwnerDashboardContent() {
-    const { user, profile, signOut } = useAuth();
+    const { user, profile, refreshProfile } = useAuth();
     const searchParams = useSearchParams();
     const [listings, setListings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
+    const [refreshing, setRefreshing] = useState(false);
+
+    const handleManualRefresh = async () => {
+        try {
+            setRefreshing(true);
+            await refreshProfile(user.id);
+            toast.success('Status refreshed!');
+        } catch (err) {
+            toast.error('Failed to refresh status');
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     // Modal state
     const [deleteModal, setDeleteModal] = useState({
@@ -116,6 +129,53 @@ function OwnerDashboardContent() {
         );
     };
 
+    // Verification required banner
+    if (!profile?.is_verified) {
+        return (
+            <div className="min-h-screen bg-background">
+                <Navbar />
+                <main className="container mx-auto px-4 py-16">
+                    <div className="max-w-lg mx-auto text-center">
+                        <div className="w-24 h-24 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <svg className="w-12 h-12 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                        </div>
+                        <h1 className="text-3xl font-bold mb-3">Verification Required</h1>
+                        <p className="text-muted-foreground mb-2">
+                            You need to verify your identity before you can create or manage listings.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-8">
+                            Submit a government-issued ID (Citizenship, Passport, or License) for admin review. This usually takes 1–2 business days.
+                        </p>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            <Link
+                                href="/owner/verify"
+                                className="w-full sm:w-auto h-12 px-8 bg-primary text-primary-foreground font-medium rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center"
+                            >
+                                Get Verified Now
+                            </Link>
+                            <button
+                                onClick={handleManualRefresh}
+                                disabled={refreshing}
+                                className="w-full sm:w-auto h-12 px-8 border border-input rounded-xl hover:bg-muted transition-colors flex items-center justify-center gap-2"
+                            >
+                                {refreshing ? (
+                                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                )}
+                                Refresh Status
+                            </button>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-background">
             <Navbar />
@@ -123,10 +183,15 @@ function OwnerDashboardContent() {
             {/* Main Content */}
             <main className="container mx-auto px-4 py-8">
                 <div className="max-w-6xl mx-auto">
-                    {/* Success Message */}
+                    {/* Success Messages */}
                     {searchParams.get('success') === 'listing_created' && (
                         <div className="bg-green-500/10 text-green-500 border border-green-500/20 p-4 rounded-lg mb-6">
-                            ✓ Listing created successfully! It's now pending admin approval.
+                            ✓ Listing created successfully! It&apos;s now pending admin approval.
+                        </div>
+                    )}
+                    {searchParams.get('success') === 'listing_updated' && (
+                        <div className="bg-green-500/10 text-green-500 border border-green-500/20 p-4 rounded-lg mb-6">
+                            ✓ Listing updated successfully!
                         </div>
                     )}
 

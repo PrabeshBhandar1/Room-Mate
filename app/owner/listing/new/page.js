@@ -462,5 +462,6 @@ function NewListing() {
     );
 }
 
-export default withAuth(NewListing, { allowedRoles: ['owner'] });
+export default withAuth(NewListing, { allowedRoles: ['owner'], requireVerified: true });
+
 

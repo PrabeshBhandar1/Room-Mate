@@ -7,59 +7,44 @@ import { useRouter } from 'next/navigation';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [profile, setProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [authState, setAuthState] = useState({
+        user: null,
+        profile: null,
+        loading: true
+    });
     const router = useRouter();
 
     useEffect(() => {
         let mounted = true;
 
-        const initializeAuth = async () => {
-            try {
-                // Get initial session
-                const { data: { session } } = await supabase.auth.getSession();
-
-                if (mounted) {
-                    if (session?.user) {
-                        setUser(session.user);
-                        // Only fetch profile if we have a user
-                        await fetchProfile(session.user.id);
-                    }
-                }
-            } catch (error) {
-                console.error('Error checking session:', error);
-            } finally {
-                if (mounted) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        initializeAuth();
-
-        // Listen for auth changes
+        // Listen for auth changes - this also handles the initial session
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!mounted) return;
+            console.log(`AuthContext [${event}]: user=${session?.user?.id}`);
 
-            // Update user state
-            setUser(session?.user ?? null);
+            const currentUser = session?.user ?? null;
 
-            if (session?.user) {
-                // If we just signed in or switched users, fetch profile
-                // We can optimize this by checking if profile.id matches session.user.id
-                // But for now, let's just ensure we fetch it.
-                // Note: We don't await this here to avoid blocking the UI updates if not strictly necessary,
-                // but for role-based auth we might need it. 
-                // However, since initializeAuth runs first, this is mostly for subsequent events.
-                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-                    await fetchProfile(session.user.id);
-                }
-            } else if (event === 'SIGNED_OUT') {
-                setProfile(null);
+            if (currentUser) {
+                // Fetch profile for any event that might have changed the session
+                const { data: profile } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', currentUser.id)
+                    .single();
+
+                setAuthState({
+                    user: currentUser,
+                    profile: profile || null,
+                    loading: false
+                });
+            } else {
+                setAuthState({
+                    user: null,
+                    profile: null,
+                    loading: false
+                });
             }
-
-            setLoading(false);
+            console.log(`AuthContext [${event}]: state updated, loading=false`);
         });
 
         return () => {
@@ -67,6 +52,27 @@ export const AuthProvider = ({ children }) => {
             subscription.unsubscribe();
         };
     }, []);
+
+    // Listen for profile changes in real-time
+    useEffect(() => {
+        if (!authState.user) return;
+
+        const profileSubscription = supabase
+            .channel(`public:users:id=eq.${authState.user.id}`)
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'users',
+                filter: `id=eq.${authState.user.id}`
+            }, (payload) => {
+                setAuthState(prev => ({ ...prev, profile: payload.new }));
+            })
+            .subscribe();
+
+        return () => {
+            profileSubscription.unsubscribe();
+        };
+    }, [authState.user?.id]);
 
     const fetchProfile = async (userId) => {
         try {
@@ -79,7 +85,7 @@ export const AuthProvider = ({ children }) => {
             if (error) {
                 console.error('Error fetching profile:', error);
             } else {
-                setProfile(data);
+                setAuthState(prev => ({ ...prev, profile: data }));
             }
         } catch (err) {
             console.error('Unexpected error fetching profile:', err);
@@ -102,11 +108,23 @@ export const AuthProvider = ({ children }) => {
                 }
             });
 
-            if (error) throw error;
+            if (error) {
+                if (
+                    error.message?.toLowerCase().includes('user already registered') ||
+                    error.message?.toLowerCase().includes('already been registered')
+                ) {
+                    return { data: null, error: { message: 'An account with this email already exists.' } };
+                }
+                throw error;
+            }
 
-            // Note: User profile is now automatically created via a database trigger
-            // using the metadata provided above. This is more robust as it works
-            // even when email confirmation is enabled.
+            if (
+                data?.user &&
+                Array.isArray(data.user.identities) &&
+                data.user.identities.length === 0
+            ) {
+                return { data: null, error: { message: 'An account with this email already exists.' } };
+            }
 
             return { data, error: null };
         } catch (error) {
@@ -121,11 +139,7 @@ export const AuthProvider = ({ children }) => {
             password,
         });
 
-        // Fetch profile after successful login
-        if (result.data?.user) {
-            await fetchProfile(result.data.user.id);
-        }
-
+        // Profile will be auto-fetched by the onAuthStateChange listener
         return result;
     };
 
@@ -139,17 +153,17 @@ export const AuthProvider = ({ children }) => {
 
     const updateProfile = async (updates) => {
         try {
-            if (!user) throw new Error('No user logged in');
+            if (!authState.user) throw new Error('No user logged in');
 
             const { data, error } = await supabase
                 .from('users')
                 .update(updates)
-                .eq('id', user.id)
+                .eq('id', authState.user.id)
                 .select()
                 .single();
 
             if (error) throw error;
-            setProfile(data);
+            setAuthState(prev => ({ ...prev, profile: data }));
             return { data, error: null };
         } catch (error) {
             console.error('Error updating profile:', error);
@@ -158,7 +172,16 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, updateProfile }}>
+        <AuthContext.Provider value={{
+            user: authState.user,
+            profile: authState.profile,
+            loading: authState.loading,
+            signUp,
+            signIn,
+            signOut,
+            updateProfile,
+            refreshProfile: fetchProfile
+        }}>
             {children}
         </AuthContext.Provider>
     );

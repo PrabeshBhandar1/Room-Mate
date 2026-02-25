@@ -18,12 +18,18 @@ function AdminDashboard() {
         activeOwners: 0
     });
     const [pendingListings, setPendingListings] = useState([]);
+    const [verificationRequests, setVerificationRequests] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Modal states
+    // Listing modal states
     const [approveModal, setApproveModal] = useState({ isOpen: false, loading: false, listingId: null });
     const [rejectModal, setRejectModal] = useState({ isOpen: false, loading: false, listingId: null });
     const [rejectionReason, setRejectionReason] = useState('');
+
+    // Verification modal states
+    const [verifyApproveModal, setVerifyApproveModal] = useState({ isOpen: false, loading: false, verificationId: null });
+    const [verifyRejectModal, setVerifyRejectModal] = useState({ isOpen: false, loading: false, verificationId: null });
+    const [verifyRejectionReason, setVerifyRejectionReason] = useState('');
 
     useEffect(() => {
         fetchDashboardData();
@@ -73,6 +79,35 @@ function AdminDashboard() {
                 setPendingListings(listingsWithOwners);
             } else {
                 setPendingListings([]);
+            }
+
+            // Fetch owner verification requests (direct query, no RPC needed)
+            const { data: verificationsData, error: verifyError } = await supabase
+                .from('owner_verifications')
+                .select('*')
+                .eq('status', 'pending')
+                .order('submitted_at', { ascending: false });
+
+            if (verifyError) {
+                console.error('Verification fetch error:', verifyError);
+                toast.error('Failed to load verification requests: ' + verifyError.message);
+            } else if (verificationsData && verificationsData.length > 0) {
+                // Enrich with owner info via existing get_user_info RPC
+                const enriched = await Promise.all(
+                    verificationsData.map(async (req) => {
+                        const { data: ownerData } = await supabase
+                            .rpc('get_user_info', { user_id: req.owner_id });
+                        const owner = ownerData && ownerData.length > 0 ? ownerData[0] : null;
+                        return {
+                            ...req,
+                            owner_name: owner?.display_name || 'Unknown',
+                            owner_email: owner?.email || 'Unknown',
+                        };
+                    })
+                );
+                setVerificationRequests(enriched);
+            } else {
+                setVerificationRequests([]);
             }
 
         } catch (error) {
@@ -150,6 +185,66 @@ function AdminDashboard() {
         } catch (error) {
             toast.error('Failed to reject listing');
             setRejectModal({ isOpen: false, loading: false, listingId: null });
+        }
+    };
+
+    // ── Verification handlers ──────────────────────────────────────────────────
+
+    const handleVerifyApproveClick = (verificationId) => {
+        setVerifyApproveModal({ isOpen: true, loading: false, verificationId });
+    };
+
+    const handleConfirmVerifyApprove = async () => {
+        const { verificationId } = verifyApproveModal;
+        if (!verificationId) return;
+
+        try {
+            setVerifyApproveModal(prev => ({ ...prev, loading: true }));
+
+            // Use the RPC function for atomicity and SECURITY DEFINER privileges
+            const { error: rpcError } = await supabase.rpc('approve_owner_verification', {
+                verification_id: verificationId
+            });
+
+            if (rpcError) throw rpcError;
+
+            // Update UI state
+            setVerificationRequests(prev => prev.filter(v => v.id !== verificationId));
+            setVerifyApproveModal({ isOpen: false, loading: false, verificationId: null });
+            toast.success('Owner verified successfully!');
+        } catch (error) {
+            console.error('Verification RPC Error:', error);
+            toast.error('Failed to approve verification: ' + (error.message || 'Unknown error'));
+            setVerifyApproveModal(prev => ({ ...prev, loading: false }));
+        }
+    };
+
+    const handleVerifyRejectClick = (verificationId) => {
+        setVerifyRejectionReason('');
+        setVerifyRejectModal({ isOpen: true, loading: false, verificationId });
+    };
+
+    const handleConfirmVerifyReject = async () => {
+        const { verificationId } = verifyRejectModal;
+        if (!verificationId) return;
+
+        try {
+            setVerifyRejectModal(prev => ({ ...prev, loading: true }));
+
+            const { error: rpcError } = await supabase.rpc('reject_owner_verification', {
+                verification_id: verificationId,
+                reason: verifyRejectionReason || null
+            });
+
+            if (rpcError) throw rpcError;
+
+            setVerificationRequests(prev => prev.filter(v => v.id !== verificationId));
+            setVerifyRejectModal({ isOpen: false, loading: false, verificationId: null });
+            toast.success('Verification request rejected.');
+        } catch (error) {
+            console.error('Rejection RPC Error:', error);
+            toast.error('Failed to reject verification: ' + (error.message || 'Unknown error'));
+            setVerifyRejectModal(prev => ({ ...prev, loading: false }));
         }
     };
 
@@ -303,10 +398,117 @@ function AdminDashboard() {
                             </div>
                         )}
                     </div>
+
+                    {/* Owner Verification Requests Section */}
+                    <div className="bg-card border border-border rounded-xl p-8 mt-8">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-bold">Owner Verification Requests</h2>
+                            {verificationRequests.length > 0 && (
+                                <span className="px-3 py-1 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-full text-sm font-medium">
+                                    {verificationRequests.length} Pending
+                                </span>
+                            )}
+                        </div>
+
+                        {loading ? (
+                            <div className="text-center py-12">
+                                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                <p className="text-muted-foreground">Loading requests...</p>
+                            </div>
+                        ) : verificationRequests.length === 0 ? (
+                            <p className="text-muted-foreground text-center py-8">
+                                No pending verification requests at the moment.
+                            </p>
+                        ) : (
+                            <div className="space-y-6">
+                                {verificationRequests.map((req) => (
+                                    <div key={req.id} className="border border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
+                                        <div className="flex flex-col md:flex-row gap-6">
+                                            {/* Document Preview */}
+                                            <div className="flex-shrink-0">
+                                                <a
+                                                    href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/verification-docs/${req.document_url}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="block w-32 h-32 rounded-lg border border-border overflow-hidden hover:opacity-80 transition-opacity"
+                                                >
+                                                    <img
+                                                        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/verification-docs/${req.document_url}`}
+                                                        alt="Identity Document"
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                            e.target.nextSibling.style.display = 'flex';
+                                                        }}
+                                                    />
+                                                    <div className="hidden w-full h-full items-center justify-center bg-muted text-muted-foreground text-xs text-center p-2">
+                                                        📄 View Document
+                                                    </div>
+                                                </a>
+                                            </div>
+
+                                            {/* Request Details */}
+                                            <div className="flex-1">
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <div>
+                                                        <h3 className="text-lg font-bold">{req.full_name}</h3>
+                                                        <p className="text-sm text-muted-foreground">{req.owner_email}</p>
+                                                    </div>
+                                                    <span className="px-2 py-1 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-full text-xs font-medium ml-2 flex-shrink-0">
+                                                        Pending
+                                                    </span>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                                                    <div>
+                                                        <span className="text-muted-foreground">Document Type:</span>
+                                                        <span className="font-medium ml-2 capitalize">{req.document_type}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-muted-foreground">Submitted:</span>
+                                                        <span className="font-medium ml-2">{new Date(req.submitted_at).toLocaleDateString()}</span>
+                                                    </div>
+                                                </div>
+
+                                                {req.note && (
+                                                    <p className="text-sm text-muted-foreground bg-muted rounded-lg p-3 mb-3">
+                                                        &ldquo;{req.note}&rdquo;
+                                                    </p>
+                                                )}
+
+                                                <div className="flex items-center gap-3 mt-4">
+                                                    <a
+                                                        href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/verification-docs/${req.document_url}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="h-10 px-4 border border-input rounded-lg hover:bg-muted transition-colors flex items-center justify-center text-sm font-medium"
+                                                    >
+                                                        View Document
+                                                    </a>
+                                                    <button
+                                                        onClick={() => handleVerifyApproveClick(req.id)}
+                                                        className="h-10 px-6 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors text-sm"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleVerifyRejectClick(req.id)}
+                                                        className="h-10 px-6 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors text-sm"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </main>
 
-            {/* Approve Confirmation Modal */}
+            {/* Approve Listing Modal */}
             <ConfirmationModal
                 isOpen={approveModal.isOpen}
                 onClose={() => setApproveModal({ isOpen: false, loading: false, listingId: null })}
@@ -317,7 +519,7 @@ function AdminDashboard() {
                 isLoading={approveModal.loading}
             />
 
-            {/* Reject Modal with Reason Input */}
+            {/* Reject Listing Modal */}
             {rejectModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -347,6 +549,53 @@ function AdminDashboard() {
                                 className="flex-1 h-11 px-6 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                             >
                                 {rejectModal.loading ? 'Rejecting...' : 'Reject Listing'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Approve Verification Modal */}
+            <ConfirmationModal
+                isOpen={verifyApproveModal.isOpen}
+                onClose={() => setVerifyApproveModal({ isOpen: false, loading: false, verificationId: null })}
+                onConfirm={handleConfirmVerifyApprove}
+                title="Approve Owner Verification"
+                message="This will mark the owner as verified and grant them full access to listing features. Are you sure?"
+                confirmText="Approve Owner"
+                isLoading={verifyApproveModal.loading}
+            />
+
+            {/* Reject Verification Modal */}
+            {verifyRejectModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full shadow-2xl">
+                        <h2 className="text-2xl font-bold mb-2">Reject Verification Request</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Provide a reason for rejection so the owner knows what to fix (optional).
+                        </p>
+
+                        <textarea
+                            value={verifyRejectionReason}
+                            onChange={(e) => setVerifyRejectionReason(e.target.value)}
+                            placeholder="e.g., Document unclear, please resubmit with a clearer photo..."
+                            className="w-full h-32 px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none mb-6"
+                        />
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setVerifyRejectModal({ isOpen: false, loading: false, verificationId: null })}
+                                disabled={verifyRejectModal.loading}
+                                className="flex-1 h-11 px-6 border border-input rounded-lg font-medium hover:bg-muted transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmVerifyReject}
+                                disabled={verifyRejectModal.loading}
+                                className="flex-1 h-11 px-6 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
+                                {verifyRejectModal.loading ? 'Rejecting...' : 'Reject Verification'}
                             </button>
                         </div>
                     </div>
