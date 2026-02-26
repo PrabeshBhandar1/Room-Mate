@@ -199,6 +199,7 @@ function EditListing() {
                 .update({
                     ...formData,
                     price_per_month: parseFloat(formData.price_per_month),
+                    status: 'pending' // Reset to pending for admin re-approval and to satisfy RLS
                 })
                 .eq('id', id);
 
